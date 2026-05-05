@@ -100,11 +100,13 @@ struct CompradorTabView: View {
         .onAppear {
             if perfiles.isEmpty { mostrarOnboarding = true }
         }
-        .sheet(isPresented: $mostrarOnboarding) {
+        // ← CAMBIADO: .sheet → .fullScreenCover para que no salga de abajo
+        .fullScreenCover(isPresented: $mostrarOnboarding) {
             BuyerOnboardingView(
                 onComplete: { mostrarOnboarding = false },
-                onBack:     { mostrarOnboarding = false }
+                onBack: { mostrarOnboarding = false }
             )
+            .interactiveDismissDisabled()
         }
     }
 }
