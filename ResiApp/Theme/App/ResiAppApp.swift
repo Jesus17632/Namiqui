@@ -103,3 +103,7 @@ struct CompradorTabView: View {
         }
     }
 }
+
+#Preview {
+    RootView()
+}

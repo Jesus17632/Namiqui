@@ -5,7 +5,6 @@
 //  Created by Dev Jr.23 on 5/5/26.
 //
 
-
 import SwiftUI
 import SwiftData
 internal import MapKit
@@ -16,7 +15,9 @@ struct MapCapturaOverlay: View {
     @Query(sort: \SimulatedCapture.fecha, order: .reverse)
     private var capturas: [SimulatedCapture]
 
+    @AppStorage("userRole") private var userRole: String = ""
     @State private var capturaSeleccionada: SimulatedCapture? = nil
+    @State private var mostrarContacto: Bool = false
 
     var body: some View {
         ZStack {
@@ -25,9 +26,9 @@ struct MapCapturaOverlay: View {
             }
             .ignoresSafeArea()
 
-            // Fondo oscuro al abrir popup
+            // Backdrop oscuro al abrir popup
             if capturaSeleccionada != nil {
-                Color.black.opacity(0.45)
+                Color.black.opacity(0.55)
                     .ignoresSafeArea()
                     .onTapGesture {
                         withAnimation(AppAnimation.spring) { capturaSeleccionada = nil }
@@ -35,22 +36,35 @@ struct MapCapturaOverlay: View {
                     .transition(.opacity)
             }
 
-            // Popup grande desde abajo
+            // Popup CENTRADO
             if let captura = capturaSeleccionada {
-                VStack {
-                    Spacer()
-                    CapturaPopup(captura: captura) {
+                CapturaPopupCentrado(
+                    captura: captura,
+                    esComprador: userRole == "comprador",
+                    onClose: {
                         withAnimation(AppAnimation.spring) { capturaSeleccionada = nil }
+                    },
+                    onContactar: {
+                        capturaSeleccionada = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            mostrarContacto = true
+                        }
                     }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                .ignoresSafeArea(edges: .bottom)
+                )
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
+        }
+        .fullScreenCover(isPresented: $mostrarContacto) {
+            ContactoSimuladoView(
+                nombreContacto: "Productor",
+                telefono: "+52 55 1234 5678",
+                onClose: { mostrarContacto = false }
+            )
         }
     }
 }
 
-// MARK: - Mapa UIKit con pins personalizados
+// MARK: - Mapa UIKit con pins
 
 struct MapaConPins: UIViewRepresentable {
     let capturas: [SimulatedCapture]
@@ -133,25 +147,21 @@ final class CapturaAnnotationView: MKAnnotationView {
         subviews.forEach { $0.removeFromSuperview() }
         layer.sublayers?.forEach { $0.removeFromSuperlayer() }
 
-        // Anillo pulsante rojo
         let pulse = CALayer()
         pulse.frame = bounds
         pulse.cornerRadius = size / 2
         pulse.backgroundColor = UIColor(red: 0.92, green: 0.18, blue: 0.18, alpha: 0.25).cgColor
         layer.insertSublayer(pulse, at: 0)
-
         let anim = CABasicAnimation(keyPath: "transform.scale")
         anim.fromValue = 0.8; anim.toValue = 1.4
         anim.duration = 1.1; anim.autoreverses = true; anim.repeatCount = .infinity
         pulse.add(anim, forKey: "pulse")
 
-        // Círculo rojo sólido
         let circle = UIView(frame: CGRect(x: 7, y: 7, width: size - 14, height: size - 14))
         circle.backgroundColor = UIColor(red: 0.92, green: 0.18, blue: 0.18, alpha: 1)
         circle.layer.cornerRadius = (size - 14) / 2
         addSubview(circle)
 
-        // Ícono
         let icon = UIImageView(image: UIImage(systemName: "exclamationmark"))
         icon.tintColor = .white
         icon.contentMode = .scaleAspectFit
@@ -160,136 +170,142 @@ final class CapturaAnnotationView: MKAnnotationView {
     }
 }
 
-// MARK: - Popup grande con transparencia
+// MARK: - Popup centrado gris claro con transparencia
 
-struct CapturaPopup: View {
+struct CapturaPopupCentrado: View {
     let captura: SimulatedCapture
+    let esComprador: Bool
     let onClose: () -> Void
+    let onContactar: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            // Handle drag indicator
-            Capsule()
-                .fill(Color.white.opacity(0.35))
-                .frame(width: 40, height: 5)
-                .padding(.top, 12)
-
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        // Badge de alerta rojo
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.caption)
-                            Text("ALERTA")
-                                .font(.caption.weight(.black))
-                                .tracking(1)
-                        }
-                        .foregroundStyle(.appRed)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.appRedSoft, in: Capsule())
-                    }
-
-                    Text("Captura de estiércol")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.white)
-
-                    Text(captura.fecha, style: .date)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.55))
+            // Header con badge alerta y botón cerrar
+            HStack(alignment: .top) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.caption)
+                    Text("ALERTA")
+                        .font(.caption.weight(.black))
+                        .tracking(1)
                 }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Color.appRed, in: Capsule())
+
                 Spacer()
+
                 Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white.opacity(0.5))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.6))
+                        .frame(width: 30, height: 30)
+                        .background(Color.primary.opacity(0.08), in: Circle())
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+            .padding(.horizontal, 20).padding(.top, 18)
 
-            Divider().background(Color.white.opacity(0.15))
+            // Título
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Captura de estiércol")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.primary)
+                Text(captura.fecha, style: .date)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20).padding(.top, 12)
 
             // Imagen placeholder
             ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.06))
-                    .frame(height: 160)
-
-                VStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.primary.opacity(0.06))
+                    .frame(height: 130)
+                VStack(spacing: 8) {
                     Image(systemName: "photo.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white.opacity(0.25))
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary.opacity(0.5))
                     Text("Imagen no disponible aún")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.35))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.horizontal, 20).padding(.top, 14)
 
             // Grid de datos
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 datoCard(emoji: emojiAnimal(captura.animal), titulo: "Animal",   valor: captura.animal)
-                datoCard(emoji: "💧",                        titulo: "Humedad",  valor: String(format: "%.0f%%",    captura.humedadPct))
-                datoCard(emoji: "📦",                        titulo: "Volumen",  valor: String(format: "%.0f m³",   captura.volumenM3))
-                datoCard(emoji: "🌾",                        titulo: "Alimento", valor: captura.alimento)
+                datoCard(emoji: "💧", titulo: "Humedad",  valor: String(format: "%.0f%%", captura.humedadPct))
+                datoCard(emoji: "📦", titulo: "Volumen",  valor: String(format: "%.0f m³", captura.volumenM3))
+                datoCard(emoji: "🌾", titulo: "Alimento", valor: captura.alimento)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            .padding(.horizontal, 20).padding(.top, 14)
+
+            // Botón Simular contacto (solo comprador)
+            if esComprador {
+                Button(action: onContactar) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "phone.fill")
+                        Text("Simular contacto").fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.appBlue)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+            }
 
             // Coordenadas
             HStack(spacing: 6) {
                 Image(systemName: "location.fill")
-                    .font(.caption).foregroundStyle(.appRed)
+                    .font(.caption2).foregroundStyle(.appRed)
                 Text(String(format: "%.5f, %.5f", captura.coordLatitud, captura.coordLongitud))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.secondary)
             }
-            .padding(.top, 16)
-            .padding(.bottom, 36)
+            .padding(.top, 14).padding(.bottom, 20)
         }
         .background(
-            RoundedRectangle(cornerRadius: AppPopup.cornerRadius, style: .continuous)
-                .fill(AppPopup.material)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.regularMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: AppPopup.cornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 0.5)
                 )
         )
-        .shadow(color: AppPopup.shadowColor, radius: AppPopup.shadowRadius, y: AppPopup.shadowY)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
+        .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
+        .padding(.horizontal, 24)
     }
 
     @ViewBuilder
     private func datoCard(emoji: String, titulo: String, valor: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text(emoji).font(.title3)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(emoji).font(.body)
                 Text(titulo)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .tracking(0.5)
             }
             Text(valor)
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.07))
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.primary.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
                 )
         )
     }
