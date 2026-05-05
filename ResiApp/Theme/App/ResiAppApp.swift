@@ -101,8 +101,10 @@ struct CompradorTabView: View {
             if perfiles.isEmpty { mostrarOnboarding = true }
         }
         .sheet(isPresented: $mostrarOnboarding) {
-            BuyerOnboardingView { mostrarOnboarding = false }
-                .interactiveDismissDisabled()
+            BuyerOnboardingView(
+                onComplete: { mostrarOnboarding = false },
+                onBack:     { mostrarOnboarding = false }
+            )
         }
     }
 }
