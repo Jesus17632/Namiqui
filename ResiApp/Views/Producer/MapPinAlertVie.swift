@@ -610,6 +610,7 @@ struct CapturaPopupCentrado: View {
             .padding(.horizontal, 20).padding(.top, 14)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                datoCard(emoji: "🐄", titulo: "Animal",   valor: "Bovino 🐄")
                 datoCard(emoji: "💧", titulo: "Humedad",  valor: String(format: "%.0f%%", captura.humedadPct))
                 datoCard(emoji: "📦", titulo: "Volumen",  valor: String(format: "%.0f m³", captura.volumenM3))
                 datoCard(emoji: "🌾", titulo: "Alimento", valor: captura.alimento)
@@ -683,6 +684,7 @@ struct CapturaPopupCentrado: View {
                 )
         )
     }
+
 }
 
 // MARK: - Popup planta (orgánica o biomasa)
@@ -830,6 +832,20 @@ struct PlantaPopupCentrado: View {
 // MARK: - HARDCODED DATA
 
 struct HardcodedData {
+    static let capturasMock: [SimulatedCapture] = [
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 45.0, volumenM3: 150.0, alimento: "Silo de maíz",      latitud: 28.4053, longitud: -106.8671),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 50.0, volumenM3: 120.0, alimento: "Pasto estrella",    latitud: 16.9056, longitud: -92.0931),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 48.0, volumenM3: 110.0, alimento: "Alfalfa",           latitud: 18.9030, longitud: -98.4380),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 40.0, volumenM3: 95.0,  alimento: "Rastrojo de maíz",  latitud: 30.5606, longitud: -115.9422),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 46.0, volumenM3: 180.0, alimento: "Sorgo forrajero",   latitud: 25.5744, longitud: -108.3667),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 52.0, volumenM3: 300.0, alimento: "Silo de maíz",      latitud: 25.5611, longitud: -103.4961),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 50.0, volumenM3: 280.0, alimento: "Silo de maíz",      latitud: 25.5833, longitud: -103.4958),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 47.0, volumenM3: 85.0,  alimento: "Pasto estrella",    latitud: 22.2150, longitud: -98.3842),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 44.0, volumenM3: 105.0, alimento: "Alfalfa",           latitud: 21.3508, longitud: -98.2250),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 55.0, volumenM3: 75.0,  alimento: "Pasto estrella",    latitud: 21.1425, longitud: -88.1522),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 53.0, volumenM3: 60.0,  alimento: "Sorgo forrajero",   latitud: 18.1833, longitud: -90.6833),
+        SimulatedCapture(producerProfileId: UUID(), humedadPct: 49.0, volumenM3: 110.0, alimento: "Rastrojo de maíz",  latitud: 19.7717, longitud: -104.3642)
+    ]
 
     // MARK: 20 capturas — zonas ganaderas bovinas documentadas de México
 
@@ -929,3 +945,4 @@ struct HardcodedData {
         PlantaInfo(id: UUID(), nombre: "Nayarit Costa BioGas",               telefono: "+52 311 200 5020", direccion: "Tepic, NAY",           latitud: 21.5042, longitud: -104.8955, tipo: .biomasa, capacidadTon: 410,  descripcion: "Costa Pacífico norte. Estiércol de ganado cebú cruzado de la sierra nayarita."),
     ]
 }
+
