@@ -73,7 +73,10 @@ struct ProductorTabView: View {
             if perfiles.isEmpty { mostrarOnboarding = true }
         }
         .sheet(isPresented: $mostrarOnboarding) {
-            ProducerOnboardingView { mostrarOnboarding = false }
+            ProducerOnboardingView(
+                onComplete: { mostrarOnboarding = false },
+                onBack: { mostrarOnboarding = false }
+            )
                 .interactiveDismissDisabled()
         }
     }

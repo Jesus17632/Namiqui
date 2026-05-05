@@ -4,7 +4,6 @@
 //
 //  Created by Dev Jr.23 on 5/5/26.
 //
-
 import SwiftUI
 import SwiftData
 internal import MapKit
@@ -13,7 +12,9 @@ struct ProducerOnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(LocationManager.self) private var locationManager
 
+    // Closures explícitos para controlar la navegación sin depender del dismiss automático
     var onComplete: () -> Void
+    var onBack: () -> Void
 
     @State private var nombre: String = ""
     @State private var telefono: String = ""
@@ -22,7 +23,6 @@ struct ProducerOnboardingView: View {
     @State private var latitudCapturada: Double = 0
     @State private var longitudCapturada: Double = 0
     @State private var errorUbicacion = false
-    @State private var aparecer = false
 
     private var formularioCompleto: Bool {
         !nombre.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -31,124 +31,146 @@ struct ProducerOnboardingView: View {
     }
 
     var body: some View {
-        ZStack {
-            AppGradients.producerBG.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                // Fondo estándar de Apple para formularios (gris muy claro en Light, negro en Dark)
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
 
-            GeometryReader { geo in
-                ForEach(0..<5) { i in
-                    Circle()
-                        .fill(Color.white.opacity(0.03))
-                        .frame(width: CGFloat(60 + i * 35))
-                        .offset(x: CGFloat(i * 55) - 30, y: CGFloat(i % 2 == 0 ? 20 : 70))
-                }
-            }.ignoresSafeArea()
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 28) {
+                        // MARK: - Header Minimalista
+                        VStack(spacing: 8) {
+                            Image(systemName: "leaf.circle.fill")
+                                .font(.system(size: 56))
+                                .foregroundStyle(Color.appGreen)
+                                .padding(.bottom, 4)
 
-                    // Header
-                    VStack(spacing: 10) {
-                        Text("🌿")
-                            .font(.system(size: 64))
-                            .scaleEffect(aparecer ? 1 : 0.3)
-                            .animation(AppAnimation.popIn, value: aparecer)
+                            Text("Perfil de Productor")
+                                .font(.title2.weight(.bold))
+                                .foregroundStyle(.primary)
 
-                        Text("Cuéntanos\nquién eres")
-                            .font(.system(size: 30, weight: .black))
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                            .opacity(aparecer ? 1 : 0)
-                            .offset(y: aparecer ? 0 : 24)
-                            .animation(AppAnimation.easeSnap.delay(0.18), value: aparecer)
+                            Text("Ingresa tus datos para comenzar")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 24)
+                        .padding(.bottom, 8)
 
-                        Text("Tu perfil de productor")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .opacity(aparecer ? 1 : 0)
-                            .animation(AppAnimation.easeSnap.delay(0.28), value: aparecer)
-                    }
-                    .padding(.top, 52)
+                        // MARK: - Formulario (Estilo iOS Settings)
+                        VStack(spacing: 0) {
+                            campoTexto(icono: "person.fill", placeholder: "Nombre completo", texto: $nombre, teclado: .default)
+                            
+                            Divider().padding(.leading, 52)
+                            
+                            campoTexto(icono: "phone.fill", placeholder: "Teléfono", texto: $telefono, teclado: .phonePad)
+                            
+                            Divider().padding(.leading, 52)
 
-                    // Campos
-                    VStack(spacing: 14) {
-                        campoTexto(icono: "person.fill", placeholder: "Nombre completo", texto: $nombre, teclado: .default)
-                        campoTexto(icono: "phone.fill",  placeholder: "Teléfono",        texto: $telefono, teclado: .phonePad)
+                            // Botón de Ubicación Integrado
+                            Button(action: capturarUbicacion) {
+                                HStack(spacing: 16) {
+                                    Image(systemName: ubicacionConfirmada ? "location.fill" : "location")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(ubicacionConfirmada ? Color.appGreen : Color.accentColor)
+                                        .frame(width: 24)
 
-                        // Botón ubicación
-                        Button(action: capturarUbicacion) {
-                            HStack(spacing: 12) {
-                                ZStack {
-                                    Circle()
-                                        .fill(ubicacionConfirmada ? Color.appGreen.opacity(0.25) : Color.surfaceWhite)
-                                        .frame(width: 38, height: 38)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(ubicacionConfirmada ? "Ubicación capturada" : "Obtener mi ubicación")
+                                            .font(.body)
+                                            .foregroundStyle(ubicacionConfirmada ? Color.appGreen : .primary)
+                                        
+                                        if ubicacionConfirmada {
+                                            Text(String(format: "%.4f, %.4f", latitudCapturada, longitudCapturada))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        } else if errorUbicacion {
+                                            Text("No se pudo obtener. Activa el GPS.")
+                                                .font(.caption)
+                                                .foregroundStyle(Color.appRed)
+                                        }
+                                    }
+                                    Spacer()
+                                    
                                     if buscandoUbicacion {
-                                        ProgressView().tint(.white)
-                                    } else {
-                                        Image(systemName: ubicacionConfirmada ? "location.fill" : "location")
-                                            .foregroundStyle(ubicacionConfirmada ? .appGreen : .white.opacity(0.7))
+                                        ProgressView()
+                                    } else if ubicacionConfirmada {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Color.appGreen)
                                     }
                                 }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(ubicacionConfirmada ? "Ubicación capturada ✓" : "Obtener mi ubicación actual")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ubicacionConfirmada ? .appGreen : .white)
-                                    if ubicacionConfirmada {
-                                        Text(String(format: "%.4f, %.4f", latitudCapturada, longitudCapturada))
-                                            .font(.caption2).foregroundStyle(.white.opacity(0.5))
-                                    } else if errorUbicacion {
-                                        Text("No se pudo obtener. Activa el GPS.")
-                                            .font(.caption2).foregroundStyle(.appRed)
-                                    }
-                                }
-                                Spacer()
+                                .padding(.vertical, 14)
+                                .padding(.horizontal, 16)
+                                .contentShape(Rectangle())
                             }
-                            .appFieldStyle()
+                            .buttonStyle(.plain)
+                            .disabled(buscandoUbicacion)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(buscandoUbicacion)
-                    }
-                    .padding(.horizontal, 24)
-                    .opacity(aparecer ? 1 : 0)
-                    .animation(AppAnimation.easeSnap.delay(0.38), value: aparecer)
+                        .background(Color(.secondarySystemGroupedBackground)) // Blanco puro en modo claro
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 20)
 
-                    // Botón confirmar
-                    Button(action: crearPerfil) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Empezar como Productor").fontWeight(.bold)
+                        // MARK: - Botón Confirmar Nativo
+                        Button(action: crearPerfil) {
+                            Text("Empezar como Productor")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
                         }
-                        .appPrimaryButton(color: .appGreen, enabled: formularioCompleto)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.appGreen)
+                        .controlSize(.large)
+                        .disabled(!formularioCompleto)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
                     }
-                    .disabled(!formularioCompleto)
-                    .padding(.horizontal, 24)
-                    .opacity(aparecer ? 1 : 0)
-                    .animation(AppAnimation.easeSnap.delay(0.48), value: aparecer)
-
-                    Spacer(minLength: 40)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            // MARK: - Custom Back Button
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: onBack) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Volver")
+                        }
+                        .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(AnimatedBackButtonStyle()) // Aplica la animación HIG
+                }
+            }
+            .onAppear {
+                if locationManager.authorizationStatus == .authorizedWhenInUse ||
+                   locationManager.authorizationStatus == .authorizedAlways {
+                    capturarUbicacion()
                 }
             }
         }
-        .onAppear {
-            aparecer = true
-            if locationManager.authorizationStatus == .authorizedWhenInUse ||
-               locationManager.authorizationStatus == .authorizedAlways {
-                capturarUbicacion()
-            }
-        }
-        .interactiveDismissDisabled()
     }
 
+    // MARK: - Componentes
+    
     @ViewBuilder
     private func campoTexto(icono: String, placeholder: String, texto: Binding<String>, teclado: UIKeyboardType) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icono).foregroundStyle(.white.opacity(0.5)).frame(width: 20)
-            TextField("", text: texto, prompt: Text(placeholder).foregroundColor(.white.opacity(0.35)))
-                .foregroundStyle(.white)
+        HStack(spacing: 16) {
+            Image(systemName: icono)
+                .font(.system(size: 20))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 24)
+            
+            TextField(placeholder, text: texto)
+                .font(.body)
                 .keyboardType(teclado)
                 .autocorrectionDisabled()
         }
-        .appFieldStyle()
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
     }
+
+    // MARK: - Lógica
 
     private func capturarUbicacion() {
         buscandoUbicacion = true
@@ -173,4 +195,22 @@ struct ProducerOnboardingView: View {
         try? modelContext.save()
         onComplete()
     }
+}
+
+// MARK: - Animación estilo Apple (Scale)
+struct AnimatedBackButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            // Reduce sutilmente el tamaño y la opacidad al tocar, como las apps nativas
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+#Preview {
+    ProducerOnboardingView(
+        onComplete: { },
+        onBack: { } // <- Solo le agregamos esto vacío para que el preview funcione
+    )
 }

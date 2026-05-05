@@ -25,97 +25,88 @@ struct PerfilProductorView: View {
     private var perfil: ProducerProfile? { perfiles.first }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                if let perfil {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            headerPerfil(perfil)
-                            datosSection(perfil)
-                            publicacionesSection(perfil)
-                        }
-                    }
-                    .ignoresSafeArea(edges: .top)
-                } else {
-                    ProgressView("Cargando perfil…")
-                }
+        ZStack {
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
-                // Toast éxito
-                if mostrarExito {
-                    VStack {
-                        Spacer()
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.appGreen)
-                            Text("Captura publicada y pin añadido al mapa 📍")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .padding(.horizontal, 20).padding(.vertical, 12)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 32)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            if let perfil {
+                VStack(spacing: 0) {
+                    headerCompacto(perfil)
+                    statsRow(perfil)
+                    accionesRow
+                    publicacionesList(perfil)
+                    Spacer(minLength: 0)
+                    botonCambiarRol
+                }
+            } else {
+                ProgressView("Cargando perfil…")
+            }
+
+            // Toast éxito
+            if mostrarExito {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.appGreen)
+                        Text("Captura publicada")
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .padding(.horizontal, 18).padding(.vertical, 12)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                    .padding(.bottom, 100)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .onAppear { aparecer = true }
-            .alert("¿Cambiar rol?", isPresented: $mostrarConfirmacionRol) {
-                Button("Cancelar", role: .cancel) {}
-                Button("Cambiar", role: .destructive) { userRole = "" }
-            } message: {
-                Text("Volverás a la pantalla de selección de rol.")
-            }
-            .onChange(of: pickerItem) { _, newItem in
-                Task { await cargarFotoPerfil(newItem) }
-            }
+        }
+        .onAppear { withAnimation(AppAnimation.easeSnap) { aparecer = true } }
+        .alert("¿Cambiar rol?", isPresented: $mostrarConfirmacionRol) {
+            Button("Cancelar", role: .cancel) {}
+            Button("Cambiar", role: .destructive) { userRole = "" }
+        } message: {
+            Text("Volverás a la pantalla de selección de rol.")
+        }
+        .onChange(of: pickerItem) { _, newItem in
+            Task { await cargarFotoPerfil(newItem) }
         }
     }
 
-    // MARK: - Header
+    // MARK: - Header compacto
 
     @ViewBuilder
-    private func headerPerfil(_ perfil: ProducerProfile) -> some View {
-        ZStack(alignment: .bottom) {
-            AppGradients.producerHeader.frame(height: 270)
-
-            // Círculos decorativos
-            GeometryReader { _ in
-                ForEach(0..<6) { i in
-                    Circle()
-                        .fill(Color.white.opacity(0.04))
-                        .frame(width: CGFloat(60 + i * 30))
-                        .offset(x: CGFloat(i * 55) - 40,
-                                y: CGFloat(i % 2 == 0 ? 20 : 65))
-                }
-            }.frame(height: 270)
-
-            VStack(spacing: 12) {
-                PhotosPicker(selection: $pickerItem, matching: .images) {
-                    ZStack(alignment: .bottomTrailing) {
-                        avatarView(perfil).frame(width: 110, height: 110)
-                        ZStack {
-                            Circle().fill(Color.appGreen).frame(width: 32, height: 32)
-                            Image(systemName: "camera.fill").font(.system(size: 14)).foregroundStyle(.white)
-                        }.offset(x: 4, y: 4)
+    private func headerCompacto(_ perfil: ProducerProfile) -> some View {
+        VStack(spacing: 14) {
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                ZStack(alignment: .bottomTrailing) {
+                    avatarView(perfil).frame(width: 96, height: 96)
+                    ZStack {
+                        Circle().fill(Color.appGreen).frame(width: 28, height: 28)
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
                     }
-                }.buttonStyle(.plain)
-
-                VStack(spacing: 4) {
-                    Text(perfil.nombre)
-                        .font(.system(size: 22, weight: .black)).foregroundStyle(.white)
-                    HStack(spacing: 6) {
-                        Image(systemName: "phone.fill").font(.caption2)
-                        Text(perfil.telefono).font(.subheadline)
-                    }.foregroundStyle(.white.opacity(0.75))
-                    HStack(spacing: 4) {
-                        Image(systemName: "location.fill").font(.caption2)
-                        Text(String(format: "%.4f, %.4f", perfil.latitud, perfil.longitud)).font(.caption)
-                    }.foregroundStyle(.white.opacity(0.5))
+                    .overlay(Circle().strokeBorder(Color(.systemGroupedBackground), lineWidth: 3))
+                    .offset(x: 2, y: 2)
                 }
-                Spacer(minLength: 24)
             }
-            .padding(.top, 60)
-            .opacity(aparecer ? 1 : 0)
-            .animation(AppAnimation.easeSnap.delay(0.1), value: aparecer)
+            .buttonStyle(.plain)
+
+            VStack(spacing: 2) {
+                Text(perfil.nombre)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(perfil.telefono)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
         }
+        .padding(.top, 24)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity)
+        .opacity(aparecer ? 1 : 0)
+        .offset(y: aparecer ? 0 : -10)
     }
 
     @ViewBuilder
@@ -126,127 +117,187 @@ struct PerfilProductorView: View {
             } else {
                 ZStack {
                     Circle().fill(LinearGradient(
-                        colors: [Color(red: 1, green: 0.87, blue: 0.2), Color(red: 0.95, green: 0.7, blue: 0.1)],
+                        colors: [Color(red: 1, green: 0.87, blue: 0.2),
+                                 Color(red: 0.95, green: 0.7, blue: 0.1)],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                    Text("🍌").font(.system(size: 52))
+                    Text("🍌").font(.system(size: 44))
                 }
             }
         }
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-        .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 3)
     }
 
-    // MARK: - Datos / Stats
+    // MARK: - Stats row (estilo iOS Settings)
 
     @ViewBuilder
-    private func datosSection(_ perfil: ProducerProfile) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                statItem(valor: "\(capturasDePerfil(perfil).count)",
-                         etiqueta: "Capturas")
-                Divider().frame(height: 40)
-                statItem(valor: String(format: "%.0f m³", volumenTotal(perfil)),
-                         etiqueta: "Volumen total")
-                Divider().frame(height: 40)
-                statItem(valor: diasRegistrado(perfil), etiqueta: "Días activo")
-            }
-            .padding(.vertical, 16)
-            .background(Color(.secondarySystemBackground))
-
-            Divider()
-
-            Button(action: simularCaptura) {
-                HStack(spacing: 10) {
-                    if simulandoCaptura {
-                        ProgressView().tint(.white)
-                    } else {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                    Text("Simular captura").fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(14)
-                .background(Color.appGreen.opacity(0.85))
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .disabled(simulandoCaptura)
-            .padding(.horizontal, 20).padding(.vertical, 16)
-
-            Divider()
+    private func statsRow(_ perfil: ProducerProfile) -> some View {
+        let capturas = capturasDePerfil(perfil)
+        HStack(spacing: 10) {
+            statCard(valor: "\(capturas.count)", label: "Capturas", color: .appGreen)
+            statCard(valor: String(format: "%.0f", volumenTotal(perfil)), label: "m³ total", color: .blue)
+            statCard(valor: diasRegistrado(perfil), label: "Días", color: .orange)
         }
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder
-    private func statItem(valor: String, etiqueta: String) -> some View {
-        VStack(spacing: 2) {
-            Text(valor).font(.system(size: 18, weight: .black))
-            Text(etiqueta).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity)
+    private func statCard(valor: String, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(valor)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(color)
+                .monospacedDigit()
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    // MARK: - Feed publicaciones
+    // MARK: - Acciones
+
+    private var accionesRow: some View {
+        Button(action: simularCaptura) {
+            HStack(spacing: 10) {
+                if simulandoCaptura {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                Text(simulandoCaptura ? "Procesando…" : "Simular captura")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(Color.appGreen, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .foregroundStyle(.white)
+        }
+        .disabled(simulandoCaptura)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
+    // MARK: - Publicaciones (con scroll interno)
 
     @ViewBuilder
-    private func publicacionesSection(_ perfil: ProducerProfile) -> some View {
+    private func publicacionesList(_ perfil: ProducerProfile) -> some View {
         let capturas = capturasDePerfil(perfil)
         VStack(alignment: .leading, spacing: 0) {
-            Text("Mis publicaciones").font(.headline)
-                .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 12)
+            HStack {
+                Text("Publicaciones")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                Spacer()
+                if !capturas.isEmpty {
+                    Text("\(capturas.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 22)
+            .padding(.bottom, 8)
 
             if capturas.isEmpty {
-                VStack(spacing: 12) {
-                    Text("🌾").font(.system(size: 48))
-                    Text("Aún no tienes capturas").font(.subheadline).foregroundStyle(.secondary)
-                    Text("Usa el botón \"Simular captura\" para empezar.")
-                        .font(.caption).foregroundStyle(.secondary.opacity(0.7))
-                        .multilineTextAlignment(.center).padding(.horizontal, 40)
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 48)
+                emptyState
             } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(capturas) { capturaCard($0) }
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(capturas.enumerated()), id: \.element.id) { idx, captura in
+                            capturaRow(captura)
+                            if idx < capturas.count - 1 {
+                                Divider().padding(.leading, 76)
+                            }
+                        }
+                    }
+                    .background(Color(.secondarySystemGroupedBackground),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 16).padding(.bottom, 24)
             }
-
-            Divider().padding(.horizontal, 20)
-            Button(role: .destructive) { mostrarConfirmacionRol = true } label: {
-                Label("Cambiar rol", systemImage: "arrow.triangle.2.circlepath")
-                    .frame(maxWidth: .infinity).padding(14)
-            }
-            .padding(.horizontal, 20).padding(.vertical, 8).padding(.bottom, 16)
         }
     }
 
-    @ViewBuilder
-    private func capturaCard(_ captura: SimulatedCapture) -> some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.appRed.opacity(0.10))
-                    .frame(width: 52, height: 52)
-                Text(emojiAnimal(captura.animal)).font(.system(size: 26))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(captura.animal).font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text(captura.fecha, style: .date).font(.caption2).foregroundStyle(.secondary)
-                }
-                HStack(spacing: 12) {
-                    Label(String(format: "%.0f%%", captura.humedadPct), systemImage: "drop.fill")
-                        .font(.caption).foregroundStyle(.blue)
-                    Label(String(format: "%.0f m³", captura.volumenM3), systemImage: "cube.fill")
-                        .font(.caption).foregroundStyle(.orange)
-                }
-                Text("🌾 \(captura.alimento)").font(.caption2).foregroundStyle(.secondary)
-            }
-            Image(systemName: "mappin.circle.fill").foregroundStyle(.appRed).font(.title3)
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("Sin publicaciones")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("Toca \"Simular captura\" para empezar")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private func capturaRow(_ captura: SimulatedCapture) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.appGreen.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                Text(emojiAnimal(captura.animal)).font(.system(size: 22))
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(captura.animal)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                HStack(spacing: 8) {
+                    Text(String(format: "%.0f m³", captura.volumenM3))
+                    Text("·")
+                    Text(String(format: "%.0f%% hum.", captura.humedadPct))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            }
+
+            Spacer()
+
+            Text(captura.fecha, format: .relative(presentation: .numeric))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Cambiar rol
+
+    private var botonCambiarRol: some View {
+        Button(role: .destructive) {
+            mostrarConfirmacionRol = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Cambiar rol")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.appRed)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Lógica
@@ -279,7 +330,7 @@ struct PerfilProductorView: View {
             try? modelContext.save()
             simulandoCaptura = false
             withAnimation(AppAnimation.spring) { mostrarExito = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 withAnimation { mostrarExito = false }
             }
         }

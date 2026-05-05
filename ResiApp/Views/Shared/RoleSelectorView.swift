@@ -10,6 +10,9 @@ import SwiftUI
 
 struct RolSelectorView: View {
     @AppStorage("userRole") private var userRole: String = ""
+    
+    // Nueva variable para controlar la vista emergente
+    @State private var mostrarOnboardingProductor = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -39,7 +42,8 @@ struct RolSelectorView: View {
                     titulo: "Soy Productor",
                     descripcion: "Tengo estiércol que quiero aprovechar"
                 ) {
-                    userRole = "productor"
+                    // Abrimos la pantalla emergente en lugar de asignar el rol de golpe
+                    mostrarOnboardingProductor = true
                 }
 
                 rolButton(
@@ -55,6 +59,20 @@ struct RolSelectorView: View {
             Spacer()
         }
         .background(Color(.systemBackground).ignoresSafeArea())
+        // Aquí conectamos el Onboarding del Productor como una vista independiente
+        .fullScreenCover(isPresented: $mostrarOnboardingProductor) {
+            ProducerOnboardingView(
+                onComplete: {
+                    // Al terminar, asignamos el rol y cerramos el modal
+                    userRole = "productor"
+                    mostrarOnboardingProductor = false
+                },
+                onBack: {
+                    // Si le da a la flechita de regreso, solo cerramos el modal
+                    mostrarOnboardingProductor = false
+                }
+            )
+        }
     }
 
     /// Card-button reutilizable para cada rol.

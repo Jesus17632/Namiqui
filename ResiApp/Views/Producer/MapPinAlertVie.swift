@@ -4,6 +4,13 @@
 //
 //  Created by Dev Jr.23 on 5/5/26.
 //
+//
+//  MapPinAlertVie.swift
+//  ResiApp
+//
+//  Created by Dev Jr.23 on 5/5/26.
+//
+
 
 import SwiftUI
 import SwiftData
@@ -15,18 +22,44 @@ struct MapCapturaOverlay: View {
     @Query(sort: \SimulatedCapture.fecha, order: .reverse)
     private var capturas: [SimulatedCapture]
 
+    @Query private var compradores: [BuyerProfile]
+
     @AppStorage("userRole") private var userRole: String = ""
     @State private var capturaSeleccionada: SimulatedCapture? = nil
     @State private var mostrarContacto: Bool = false
+    @State private var mostrarChat: Bool = false
+
+    // COMBINAMOS LOS DATOS DE SWIFTDATA CON LOS DATOS HARDCODEADOS
+    private var todasLasCapturas: [SimulatedCapture] {
+        capturas + HardcodedData.capturasMock
+    }
+    
+    private var todosLosCompradores: [BuyerProfile] {
+        compradores + HardcodedData.compradoresMock
+    }
 
     var body: some View {
         ZStack {
-            MapaConPins(capturas: capturas) { captura in
-                withAnimation(AppAnimation.spring) { capturaSeleccionada = captura }
-            }
+            MapaConPins(
+                capturas: todasLasCapturas,       // Pasamos el arreglo combinado
+                compradores: todosLosCompradores, // Pasamos el arreglo combinado
+                onSelectCaptura: { captura in
+                    withAnimation(AppAnimation.spring) { capturaSeleccionada = captura }
+                }
+            )
             .ignoresSafeArea()
 
-            // Backdrop oscuro al abrir popup
+            // 💬 CHATBOT FAB — esquina superior izquierda
+            VStack {
+                HStack {
+                    ChatBotButton(mostrarChat: $mostrarChat)
+                        .padding(.leading, 16)
+                        .padding(.top, 65)
+                    Spacer()
+                }
+                Spacer()
+            }
+
             if capturaSeleccionada != nil {
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
@@ -36,7 +69,6 @@ struct MapCapturaOverlay: View {
                     .transition(.opacity)
             }
 
-            // Popup CENTRADO
             if let captura = capturaSeleccionada {
                 CapturaPopupCentrado(
                     captura: captura,
@@ -61,16 +93,48 @@ struct MapCapturaOverlay: View {
                 onClose: { mostrarContacto = false }
             )
         }
+        .sheet(isPresented: $mostrarChat) {
+            // Conecta aquí tu ChatBotView
+            Text("Chat Bot")
+        }
     }
 }
 
-// MARK: - Mapa UIKit con pins
+// MARK: - ChatBot FAB
+
+struct ChatBotButton: View {
+    @Binding var mostrarChat: Bool
+
+    var body: some View {
+        Button(action: { mostrarChat = true }) {
+            ZStack {
+                // Círculo principal sólido verde
+                Circle()
+                    .fill(Color.appGreen)
+                    .frame(width: 56, height: 56) // Tamaño ajustado para buen área táctil
+                    .shadow(
+                        color: Color.appGreen.opacity(0.4),
+                        radius: 6, y: 3
+                    )
+
+                Image(systemName: "message.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+}
+
+// MARK: - Mapa UIKit con pins (capturas + compradores)
 
 struct MapaConPins: UIViewRepresentable {
     let capturas: [SimulatedCapture]
-    var onSelect: (SimulatedCapture) -> Void
+    let compradores: [BuyerProfile]
+    var onSelectCaptura: (SimulatedCapture) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect, capturas: capturas) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelect: onSelectCaptura, capturas: capturas)
+    }
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
@@ -78,19 +142,34 @@ struct MapaConPins: UIViewRepresentable {
         map.showsUserLocation = true
         map.register(CapturaAnnotationView.self,
                      forAnnotationViewWithReuseIdentifier: CapturaAnnotationView.reuseID)
+        map.register(BuyerAnnotationView.self,
+                     forAnnotationViewWithReuseIdentifier: BuyerAnnotationView.reuseID)
         return map
     }
 
     func updateUIView(_ map: MKMapView, context: Context) {
-        let existing = map.annotations.compactMap { $0 as? CapturaAnnotation }
-        map.removeAnnotations(existing)
-        let nuevas = capturas.map {
+        let viejas = map.annotations.filter {
+            $0 is CapturaAnnotation || $0 is BuyerAnnotation
+        }
+        map.removeAnnotations(viejas)
+
+        let pinsCaptura = capturas.map {
             CapturaAnnotation(
                 coordinate: CLLocationCoordinate2D(latitude: $0.coordLatitud, longitude: $0.coordLongitud),
                 capturaId: $0.id
             )
         }
-        map.addAnnotations(nuevas)
+        map.addAnnotations(pinsCaptura)
+
+        let pinsBuyer = compradores.map {
+            BuyerAnnotation(
+                coordinate: CLLocationCoordinate2D(latitude: $0.latitud, longitude: $0.longitud),
+                nombre: $0.nombre,
+                direccion: $0.direccion
+            )
+        }
+        map.addAnnotations(pinsBuyer)
+
         context.coordinator.capturas = capturas
     }
 
@@ -103,11 +182,20 @@ struct MapaConPins: UIViewRepresentable {
         }
 
         func mapView(_ map: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let ann = annotation as? CapturaAnnotation else { return nil }
-            let v = map.dequeueReusableAnnotationView(
-                withIdentifier: CapturaAnnotationView.reuseID, for: ann) as? CapturaAnnotationView
-            v?.configure()
-            return v
+            if let ann = annotation as? CapturaAnnotation {
+                let v = map.dequeueReusableAnnotationView(
+                    withIdentifier: CapturaAnnotationView.reuseID, for: ann) as? CapturaAnnotationView
+                v?.configure()
+                return v
+            }
+            if let ann = annotation as? BuyerAnnotation {
+                let v = map.dequeueReusableAnnotationView(
+                    withIdentifier: BuyerAnnotationView.reuseID, for: ann) as? BuyerAnnotationView
+                v?.configure()
+                v?.canShowCallout = true
+                return v
+            }
+            return nil
         }
 
         func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
@@ -119,7 +207,7 @@ struct MapaConPins: UIViewRepresentable {
     }
 }
 
-// MARK: - Annotation
+// MARK: - Annotations
 
 final class CapturaAnnotation: NSObject, MKAnnotation {
     let coordinate: CLLocationCoordinate2D
@@ -129,7 +217,19 @@ final class CapturaAnnotation: NSObject, MKAnnotation {
     }
 }
 
-// MARK: - Pin rojo pulsante
+final class BuyerAnnotation: NSObject, MKAnnotation {
+    let coordinate: CLLocationCoordinate2D
+    let title: String?
+    let subtitle: String?
+
+    init(coordinate: CLLocationCoordinate2D, nombre: String, direccion: String) {
+        self.coordinate = coordinate
+        self.title = nombre
+        self.subtitle = direccion
+    }
+}
+
+// MARK: - Pin verde pulsante (capturas = oportunidad)
 
 final class CapturaAnnotationView: MKAnnotationView {
     static let reuseID = "CapturaAnnotationView"
@@ -147,18 +247,20 @@ final class CapturaAnnotationView: MKAnnotationView {
         subviews.forEach { $0.removeFromSuperview() }
         layer.sublayers?.forEach { $0.removeFromSuperlayer() }
 
+        // Anillo pulsante verde oportunidad (USANDO EL THEME)
         let pulse = CALayer()
         pulse.frame = bounds
         pulse.cornerRadius = size / 2
-        pulse.backgroundColor = UIColor(red: 0.92, green: 0.18, blue: 0.18, alpha: 0.25).cgColor
+        pulse.backgroundColor = UIColor(Color.appGreen).withAlphaComponent(0.25).cgColor
         layer.insertSublayer(pulse, at: 0)
         let anim = CABasicAnimation(keyPath: "transform.scale")
         anim.fromValue = 0.8; anim.toValue = 1.4
         anim.duration = 1.1; anim.autoreverses = true; anim.repeatCount = .infinity
         pulse.add(anim, forKey: "pulse")
 
+        // Círculo verde esmeralda (USANDO EL THEME)
         let circle = UIView(frame: CGRect(x: 7, y: 7, width: size - 14, height: size - 14))
-        circle.backgroundColor = UIColor(red: 0.92, green: 0.18, blue: 0.18, alpha: 1)
+        circle.backgroundColor = UIColor(Color.appGreen)
         circle.layer.cornerRadius = (size - 14) / 2
         addSubview(circle)
 
@@ -170,7 +272,57 @@ final class CapturaAnnotationView: MKAnnotationView {
     }
 }
 
-// MARK: - Popup centrado gris claro con transparencia
+// MARK: - Pin azul tienda (comprador)
+
+final class BuyerAnnotationView: MKAnnotationView {
+    static let reuseID = "BuyerAnnotationView"
+    private let size: CGFloat = 44
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame = CGRect(origin: .zero, size: CGSize(width: size, height: size))
+        centerOffset = CGPoint(x: 0, y: -size / 2)
+        backgroundColor = .clear
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure() {
+        subviews.forEach { $0.removeFromSuperview() }
+        layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+
+        // Anillo blanco con sombra
+        let ring = UIView(frame: bounds)
+        ring.backgroundColor = .white
+        ring.layer.cornerRadius = size / 2
+        ring.layer.shadowColor = UIColor.black.cgColor
+        ring.layer.shadowOpacity = 0.3
+        ring.layer.shadowRadius = 6
+        ring.layer.shadowOffset = CGSize(width: 0, height: 3)
+        addSubview(ring)
+
+        // Círculo azul interior (USANDO EL THEME)
+        let inset: CGFloat = 4
+        let circle = UIView(frame: CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2))
+        circle.backgroundColor = UIColor(Color.appBlue)
+        circle.layer.cornerRadius = (size - inset * 2) / 2
+        addSubview(circle)
+
+        // Ícono de tienda (storefront)
+        let icon = UIImageView(image: UIImage(systemName: "storefront.fill"))
+        icon.tintColor = .white
+        icon.contentMode = .scaleAspectFit
+        let iconSize: CGFloat = 20
+        icon.frame = CGRect(
+            x: (size - iconSize) / 2,
+            y: (size - iconSize) / 2,
+            width: iconSize,
+            height: iconSize
+        )
+        addSubview(icon)
+    }
+}
+
+// MARK: - Popup centrado
 
 struct CapturaPopupCentrado: View {
     let captura: SimulatedCapture
@@ -180,18 +332,14 @@ struct CapturaPopupCentrado: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header con badge alerta y botón cerrar
             HStack(alignment: .top) {
                 HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .font(.caption)
-                    Text("ALERTA")
-                        .font(.caption.weight(.black))
-                        .tracking(1)
+                    Image(systemName: "exclamationmark.circle.fill").font(.caption)
+                    Text("OPORTUNIDAD").font(.caption.weight(.black)).tracking(1)
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Color.appRed, in: Capsule())
+                .background(Color.appGreen, in: Capsule()) // USANDO EL THEME
 
                 Spacer()
 
@@ -205,7 +353,6 @@ struct CapturaPopupCentrado: View {
             }
             .padding(.horizontal, 20).padding(.top, 18)
 
-            // Título
             VStack(alignment: .leading, spacing: 4) {
                 Text("Captura de estiércol")
                     .font(.title3.weight(.bold))
@@ -217,7 +364,6 @@ struct CapturaPopupCentrado: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.top, 12)
 
-            // Imagen placeholder
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color.primary.opacity(0.06))
@@ -233,7 +379,6 @@ struct CapturaPopupCentrado: View {
             }
             .padding(.horizontal, 20).padding(.top, 14)
 
-            // Grid de datos
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 datoCard(emoji: emojiAnimal(captura.animal), titulo: "Animal",   valor: captura.animal)
                 datoCard(emoji: "💧", titulo: "Humedad",  valor: String(format: "%.0f%%", captura.humedadPct))
@@ -242,7 +387,6 @@ struct CapturaPopupCentrado: View {
             }
             .padding(.horizontal, 20).padding(.top, 14)
 
-            // Botón Simular contacto (solo comprador)
             if esComprador {
                 Button(action: onContactar) {
                     HStack(spacing: 8) {
@@ -251,7 +395,7 @@ struct CapturaPopupCentrado: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.appBlue)
+                    .background(Color.appBlue) // USANDO EL THEME
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -259,10 +403,10 @@ struct CapturaPopupCentrado: View {
                 .padding(.top, 18)
             }
 
-            // Coordenadas
             HStack(spacing: 6) {
                 Image(systemName: "location.fill")
-                    .font(.caption2).foregroundStyle(.appRed)
+                    .font(.caption2)
+                    .foregroundStyle(Color.appGreen) // USANDO EL THEME
                 Text(String(format: "%.5f, %.5f", captura.coordLatitud, captura.coordLongitud))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -318,4 +462,40 @@ struct CapturaPopupCentrado: View {
         if raw.contains("Ovino")   { return "🐑" }
         return "🐾"
     }
+}
+
+// MARK: - HARDCODED DATA
+struct HardcodedData {
+    // +20 Zonas Ganaderas (Alejadas de las ciudades principales)
+    static let capturasMock: [SimulatedCapture] = [
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 45.0, volumenM3: 150.0, alimento: "Forraje", latitud: 28.4053, longitud: -106.8671),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Porcino", humedadPct: 60.0, volumenM3: 80.5, alimento: "Grano", latitud: 20.8144, longitud: -102.7686),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 50.0, volumenM3: 120.0, alimento: "Pasto mixto", latitud: 16.9056, longitud: -92.0931),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Ovino", humedadPct: 35.0, volumenM3: 40.0, alimento: "Pasto seco", latitud: 19.3142, longitud: -97.9255),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Porcino", humedadPct: 55.0, volumenM3: 90.0, alimento: "Concentrado", latitud: 18.8858, longitud: -97.7275),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 48.0, volumenM3: 110.0, alimento: "Alfalfa", latitud: 18.9030, longitud: -98.4380),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Aviar", humedadPct: 30.0, volumenM3: 200.0, alimento: "Maíz", latitud: 18.4611, longitud: -97.3931),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 40.0, volumenM3: 95.0, alimento: "Paja", latitud: 30.5606, longitud: -115.9422),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Porcino", humedadPct: 58.0, volumenM3: 130.0, alimento: "Soya", latitud: 27.0722, longitud: -109.4439),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 46.0, volumenM3: 180.0, alimento: "Sorgo", latitud: 25.5744, longitud: -108.3667),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 52.0, volumenM3: 300.0, alimento: "Silo de maíz", latitud: 25.5611, longitud: -103.4961),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 50.0, volumenM3: 280.0, alimento: "Silo de maíz", latitud: 25.5833, longitud: -103.4958),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Porcino", humedadPct: 62.0, volumenM3: 150.0, alimento: "Alimento balanceado", latitud: 20.3411, longitud: -102.0225),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 47.0, volumenM3: 85.0, alimento: "Pasto tropical", latitud: 22.2150, longitud: -98.3842),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 44.0, volumenM3: 105.0, alimento: "Estrella de África", latitud: 21.3508, longitud: -98.2250),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 55.0, volumenM3: 75.0, alimento: "Guinea", latitud: 21.1425, longitud: -88.1522),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 53.0, volumenM3: 60.0, alimento: "Pasto natural", latitud: 18.1833, longitud: -90.6833),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Ovino", humedadPct: 38.0, volumenM3: 45.0, alimento: "Zacate", latitud: 16.6975, longitud: -93.7214),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Bovino", humedadPct: 49.0, volumenM3: 110.0, alimento: "Caña de azúcar", latitud: 19.7717, longitud: -104.3642),
+        SimulatedCapture(id: UUID(), producerProfileId: UUID(), fecha: Date(), animal: "Porcino", humedadPct: 57.0, volumenM3: 140.0, alimento: "Mezcla comercial", latitud: 25.9222, longitud: -109.1731)
+    ]
+
+    // 5 Plantas procesadoras de fertilizante
+    static let compradoresMock: [BuyerProfile] = [
+        BuyerProfile(id: UUID(), nombre: "BioFertilizantes del Bajío", telefono: "+52 461 555 0101", direccion: "Celaya, GTO", latitud: 20.5281, longitud: -100.8122),
+        BuyerProfile(id: UUID(), nombre: "Agroquímicos e Insumos", telefono: "+52 462 555 0102", direccion: "Irapuato, GTO", latitud: 20.6736, longitud: -101.3500),
+        BuyerProfile(id: UUID(), nombre: "Planta Industrial Norte", telefono: "+52 81 555 0103", direccion: "Pesquería, NL", latitud: 25.7836, longitud: -100.0519),
+        BuyerProfile(id: UUID(), nombre: "Procesadora Agro", telefono: "+52 33 555 0104", direccion: "Zapopan Norte, JAL", latitud: 20.7300, longitud: -103.4350),
+        BuyerProfile(id: UUID(), nombre: "Fertilizantes del Golfo", telefono: "+52 921 555 0105", direccion: "Coatzacoalcos, VER", latitud: 18.1342, longitud: -94.4447)
+    ]
 }
