@@ -1,6 +1,26 @@
 # Xcode
-   xcuserdata/
-   *.xcuserstate
-   DerivedData/
+DerivedData/
+.build/
 
-UserInterfaceState.xcuserstate
+# User settings
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+Packages/
+Package.resolved
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+
+# macOS
+.DS_Store
+
+# Archives
+*.xcarchive
+
+# Temporary
+*.swp
+*.tmp
